@@ -2,14 +2,11 @@
  * Server instance creation
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-import { CatFactsTool } from './tools/index.js';
-import { ServerConfig, TransportConfig } from './types.js';
-import { StdioTransport, HttpTransport } from './transport/index.js';
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CatFactsTool } from "./tools/index.js";
+import { ServerConfig, TransportConfig, ToolArgs } from "./types.js";
+import { StdioTransport, HttpTransport } from "./transport/index.js";
 
 export class CatFactsMCPServer {
   private server: Server;
@@ -19,7 +16,7 @@ export class CatFactsMCPServer {
   constructor(config: ServerConfig) {
     this.config = config;
     this.tool = new CatFactsTool(config);
-    
+
     this.server = new Server(
       {
         name: config.name,
@@ -39,13 +36,14 @@ export class CatFactsMCPServer {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
-        tools: this.tool.getToolDefinitions()
+        tools: this.tool.getToolDefinitions(),
       };
     });
 
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
+      const { name } = request.params;
+      const args = (request.params.arguments ?? {}) as ToolArgs;
 
       try {
         const result = await this.tool.handleToolCall(name, args);
@@ -54,11 +52,11 @@ export class CatFactsMCPServer {
         return {
           content: [
             {
-              type: 'text',
-              text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-            }
+              type: "text",
+              text: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+            },
           ],
-          isError: true
+          isError: true,
         };
       }
     });
@@ -66,8 +64,8 @@ export class CatFactsMCPServer {
 
   async run(transportConfig: TransportConfig) {
     let transport;
-    
-    if (transportConfig.type === 'stdio') {
+
+    if (transportConfig.type === "stdio") {
       const stdioTransport = new StdioTransport(transportConfig);
       transport = stdioTransport.createTransport();
       await stdioTransport.start();
