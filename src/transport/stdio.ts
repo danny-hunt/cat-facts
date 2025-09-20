@@ -2,8 +2,8 @@
  * STDIO transport for development
  */
 
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { TransportConfig } from '../types.js';
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { TransportConfig } from "../types.js";
 
 export class StdioTransport {
   private config: TransportConfig;
@@ -17,6 +17,6 @@ export class StdioTransport {
   }
 
   async start() {
-    console.error('Cat Facts MCP Server running on stdio');
+    console.error("Cat Facts MCP Server running on stdio");
   }
 }

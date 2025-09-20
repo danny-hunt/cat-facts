@@ -29,24 +29,24 @@ export class CatFactsMCPServer {
       }
     );
 
-    this.setupToolHandlers();
+    this.configureToolHandlers(this.server, this.tool);
   }
 
-  private setupToolHandlers() {
+  private configureToolHandlers(server: Server, tool: CatFactsTool) {
     // List available tools
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
-        tools: this.tool.getToolDefinitions(),
+        tools: tool.getToolDefinitions(),
       };
     });
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name } = request.params;
       const args = (request.params.arguments ?? {}) as ToolArgs;
 
       try {
-        const result = await this.tool.handleToolCall(name, args);
+        const result = await tool.handleToolCall(name, args);
         return result;
       } catch (error) {
         return {
@@ -62,19 +62,35 @@ export class CatFactsMCPServer {
     });
   }
 
-  async run(transportConfig: TransportConfig) {
-    let transport;
+  private createStandaloneServer = (): Server => {
+    const server = new Server(
+      {
+        name: this.config.name,
+        version: this.config.version,
+      },
+      {
+        capabilities: {
+          tools: {},
+        },
+      }
+    );
 
+    const tool = new CatFactsTool(this.config);
+    this.configureToolHandlers(server, tool);
+    return server;
+  };
+
+  async run(transportConfig: TransportConfig) {
     if (transportConfig.type === "stdio") {
       const stdioTransport = new StdioTransport(transportConfig);
-      transport = stdioTransport.createTransport();
+      const transport = stdioTransport.createTransport();
       await stdioTransport.start();
-    } else {
-      const httpTransport = new HttpTransport(transportConfig);
-      transport = httpTransport.createTransport();
-      await httpTransport.start();
+      await this.server.connect(transport);
+      return;
     }
 
-    await this.server.connect(transport);
+    // HTTP mode: start streamable HTTP transport with per-session servers
+    const httpTransport = new HttpTransport(transportConfig);
+    await httpTransport.start(this.createStandaloneServer);
   }
 }
