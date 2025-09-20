@@ -1,5 +1,5 @@
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 /**
  * Runs the MCP server using STDIO transport
@@ -8,7 +8,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
  * @returns {Promise<void>}
  */
 export async function runStdioTransport(server: Server): Promise<void> {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Cat facts MCP server running on stdio");
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error('Brave Search MCP server running on stdio');
 }

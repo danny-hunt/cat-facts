@@ -1,137 +1,157 @@
+import { createServer, IncomingMessage, ServerResponse } from 'http';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { randomUUID } from 'crypto';
+import { createStandaloneServer } from '../server.js';
+import { Config } from '../config.js';
+
+/** Session storage for streamable HTTP connections */
+const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: any }>();
+
 /**
- * HTTP transport (streamable HTTP with session management)
+ * Starts the HTTP transport server
+ * @param {Config} config - Server configuration
  */
-
-import { createServer, IncomingMessage, ServerResponse } from "http";
-import { randomUUID } from "crypto";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { TransportConfig } from "../types.js";
-
-type SessionRecord = { transport: StreamableHTTPServerTransport; server: Server };
-
-export class HttpTransport {
-  private config: TransportConfig;
-  private sessions = new Map<string, SessionRecord>();
-
-  constructor(config: TransportConfig) {
-    this.config = config;
-  }
-
-  /**
-   * Start the HTTP transport server. A factory is provided to create a new MCP Server per session.
-   */
-  async start(createStandaloneServer: () => Server) {
+export function startHttpTransport(config: Config): void {
     const httpServer = createServer();
 
-    httpServer.on("request", async (req, res) => {
-      const url = new URL(req.url || "/", `http://${req.headers.host}`);
+    httpServer.on('request', async (req, res) => {
+        const url = new URL(req.url!, `http://${req.headers.host}`);
 
-      switch (url.pathname) {
-        case "/mcp":
-          await this.handleMcpRequest(req, res, createStandaloneServer);
-          break;
-        case "/health":
-          this.handleHealthCheck(res);
-          break;
-        default:
-          this.handleNotFound(res);
-      }
+        switch (url.pathname) {
+            case '/mcp':
+                await handleMcpRequest(req, res, config);
+                break;
+            case '/health':
+                handleHealthCheck(res);
+                break;
+            default:
+                handleNotFound(res);
+        }
     });
 
-    const isProduction = process.env.NODE_ENV === "production";
-    const host = this.config.host ?? (isProduction ? "0.0.0.0" : "localhost");
-    const port = this.config.port ?? 3000;
-
-    await new Promise<void>((resolve) => {
-      httpServer.listen(port, host, () => resolve());
+    const host = config.isProduction ? '0.0.0.0' : 'localhost';
+    
+    httpServer.listen(config.port, host, () => {
+        logServerStart(config);
     });
+}
 
-    const displayUrl = isProduction ? `Port ${port}` : `http://localhost:${port}`;
-    console.log(`Cat Facts MCP Server listening on ${displayUrl}`);
-
-    if (!isProduction) {
-      console.log("Put this in your client config:");
-      console.log(
-        JSON.stringify(
-          {
-            mcpServers: {
-              "cat-facts": {
-                url: `http://localhost:${port}/mcp`,
-              },
-            },
-          },
-          null,
-          2
-        )
-      );
-    }
-  }
-
-  private async handleMcpRequest(
+/**
+ * Handles MCP protocol requests
+ * @param {IncomingMessage} req - HTTP request
+ * @param {ServerResponse} res - HTTP response
+ * @param {Config} config - Server configuration
+ * @returns {Promise<void>}
+ * @private
+ */
+async function handleMcpRequest(
     req: IncomingMessage,
     res: ServerResponse,
-    createStandaloneServer: () => Server
-  ): Promise<void> {
-    const sessionId = req.headers["mcp-session-id"] as string | undefined;
+    config: Config
+): Promise<void> {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
     if (sessionId) {
-      const session = this.sessions.get(sessionId);
-      if (!session) {
-        res.statusCode = 404;
-        res.end("Session not found");
-        return;
-      }
-      return await session.transport.handleRequest(req, res);
+        const session = sessions.get(sessionId);
+        if (!session) {
+            res.statusCode = 404;
+            res.end('Session not found');
+            return;
+        }
+        return await session.transport.handleRequest(req, res);
     }
 
-    if (req.method === "POST") {
-      await this.createNewSession(req, res, createStandaloneServer);
-      return;
+    if (req.method === 'POST') {
+        await createNewSession(req, res, config);
+        return;
     }
 
     res.statusCode = 400;
-    res.end("Invalid request");
-  }
+    res.end('Invalid request');
+}
 
-  private async createNewSession(
+/**
+ * Creates a new MCP session for HTTP transport
+ * @param {IncomingMessage} req - HTTP request
+ * @param {ServerResponse} res - HTTP response
+ * @param {Config} config - Server configuration
+ * @returns {Promise<void>}
+ * @private
+ */
+async function createNewSession(
     req: IncomingMessage,
     res: ServerResponse,
-    createStandaloneServer: () => Server
-  ): Promise<void> {
-    const serverInstance = createStandaloneServer();
+    config: Config
+): Promise<void> {
+    const serverInstance = createStandaloneServer(config.apiKey);
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (newSessionId: string) => {
-        this.sessions.set(newSessionId, { transport, server: serverInstance });
-        console.log("New Cat Facts session created:", newSessionId);
-      },
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (sessionId) => {
+            sessions.set(sessionId, { transport, server: serverInstance });
+            console.log('New Brave Search session created:', sessionId);
+        }
     });
 
     transport.onclose = () => {
-      if (transport.sessionId) {
-        this.sessions.delete(transport.sessionId);
-        console.log("Cat Facts session closed:", transport.sessionId);
-      }
+        if (transport.sessionId) {
+            sessions.delete(transport.sessionId);
+            console.log('Brave Search session closed:', transport.sessionId);
+        }
     };
 
     try {
-      await serverInstance.connect(transport);
-      await transport.handleRequest(req, res);
+        await serverInstance.connect(transport);
+        await transport.handleRequest(req, res);
     } catch (error) {
-      console.error("Streamable HTTP connection error:", error);
-      res.statusCode = 500;
-      res.end("Internal server error");
+        console.error('Streamable HTTP connection error:', error);
+        res.statusCode = 500;
+        res.end('Internal server error');
     }
-  }
+}
 
-  private handleHealthCheck(res: ServerResponse): void {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "healthy", timestamp: new Date().toISOString() }));
-  }
+/**
+ * Handles health check endpoint
+ * @param {ServerResponse} res - HTTP response
+ * @private
+ */
+function handleHealthCheck(res: ServerResponse): void {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+        status: 'healthy', 
+        timestamp: new Date().toISOString() 
+    }));
+}
 
-  private handleNotFound(res: ServerResponse): void {
-    res.writeHead(404, { "Content-Type": "text/plain" });
-    res.end("Not Found");
-  }
+/**
+ * Handles 404 Not Found responses
+ * @param {ServerResponse} res - HTTP response
+ * @private
+ */
+function handleNotFound(res: ServerResponse): void {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
+}
+
+/**
+ * Logs server startup information
+ * @param {Config} config - Server configuration
+ * @private
+ */
+function logServerStart(config: Config): void {
+    const displayUrl = config.isProduction 
+        ? `Port ${config.port}` 
+        : `http://localhost:${config.port}`;
+    
+    console.log(`Brave Search MCP Server listening on ${displayUrl}`);
+
+    if (!config.isProduction) {
+        console.log('Put this in your client config:');
+        console.log(JSON.stringify({
+            "mcpServers": {
+                "brave-search": {
+                    "url": `http://localhost:${config.port}/mcp`
+                }
+            }
+        }, null, 2));
+    }
 }

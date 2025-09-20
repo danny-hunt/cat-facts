@@ -1,49 +1,111 @@
 /**
- * TypeScript type definitions for the Cat Facts MCP Server
+ * Type definitions for Brave Search API integration
  */
 
-export interface CatFact {
-  fact: string;
-  length: number;
+/**
+ * Rate limiting configuration
+ * @interface RateLimit
+ */
+export interface RateLimit {
+    /** Requests per second */
+    perSecond: number;
+    /** Requests per month */
+    perMonth: number;
 }
 
-export interface CatFactsResponse {
-  data: CatFact[];
-  current_page: number;
-  per_page: number;
-  total: number;
-  last_page: number;
+/**
+ * Rate limiting state tracking
+ * @interface RequestCount
+ */
+export interface RequestCount {
+    /** Current second count */
+    second: number;
+    /** Current month count */
+    month: number;
+    /** Last reset timestamp */
+    lastReset: number;
 }
 
-export interface CatFactResponse {
-  fact: string;
-  length: number;
+/**
+ * Brave Web Search API response structure
+ * @interface BraveWeb
+ */
+export interface BraveWeb {
+    web?: {
+        results?: Array<{
+            title: string;
+            description: string;
+            url: string;
+            language?: string;
+            published?: string;
+            rank?: number;
+        }>;
+    };
+    locations?: {
+        results?: Array<{
+            id: string;
+            title?: string;
+        }>;
+    };
 }
 
-export interface ToolArgs {
-  max_length?: number;
-  limit?: number;
+/**
+ * Brave Local Search location data
+ * @interface BraveLocation
+ */
+export interface BraveLocation {
+    id: string;
+    name: string;
+    address: {
+        streetAddress?: string;
+        addressLocality?: string;
+        addressRegion?: string;
+        postalCode?: string;
+    };
+    coordinates?: {
+        latitude: number;
+        longitude: number;
+    };
+    phone?: string;
+    rating?: {
+        ratingValue?: number;
+        ratingCount?: number;
+    };
+    openingHours?: string[];
+    priceRange?: string;
 }
 
-export interface ServerConfig {
-  name: string;
-  version: string;
-  apiBaseUrl: string;
-  defaultLimit: number;
-  maxLimit: number;
-  minLength: number;
-  maxLength: number;
+/**
+ * Brave POI (Points of Interest) API response
+ * @interface BravePoiResponse
+ */
+export interface BravePoiResponse {
+    results: BraveLocation[];
 }
 
-export interface TransportConfig {
-  type: 'stdio' | 'http';
-  port?: number;
-  host?: string;
+/**
+ * Brave Descriptions API response
+ * @interface BraveDescription
+ */
+export interface BraveDescription {
+    descriptions: { [id: string]: string };
 }
 
-export interface CliArgs {
-  transport?: 'stdio' | 'http';
-  port?: number;
-  host?: string;
-  help?: boolean;
+/**
+ * Web search tool arguments
+ * @interface WebSearchArgs
+ */
+export interface WebSearchArgs {
+    query: string;
+    count?: number;
+    offset?: number;
+}
+
+/**
+ * Local search tool arguments
+ * @interface LocalSearchArgs
+ */
+export interface LocalSearchArgs {
+    query: string;
+    count?: number;
 }

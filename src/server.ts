@@ -1,96 +1,143 @@
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import {
+    CallToolRequestSchema,
+    ErrorCode,
+    ListToolsRequestSchema,
+    McpError,
+} from '@modelcontextprotocol/sdk/types.js';
+import { BraveClient } from './client.js';
+import {
+    webSearchToolDefinition,
+    localSearchToolDefinition,
+    handleWebSearchTool,
+    handleLocalSearchTool
+} from './tools/index.js';
+
 /**
- * Server instance creation
+ * Main server class for Brave Search MCP integration
+ * @class BraveServer
  */
+export class BraveServer {
+    private client: BraveClient;
+    private server: Server;
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { CatFactsTool } from "./tools/index.js";
-import { ServerConfig, TransportConfig, ToolArgs } from "./types.js";
-import { StdioTransport, HttpTransport } from "./transport/index.js";
-
-export class CatFactsMCPServer {
-  private server: Server;
-  private tool: CatFactsTool;
-  private config: ServerConfig;
-
-  constructor(config: ServerConfig) {
-    this.config = config;
-    this.tool = new CatFactsTool(config);
-
-    this.server = new Server(
-      {
-        name: config.name,
-        version: config.version,
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
-
-    this.configureToolHandlers(this.server, this.tool);
-  }
-
-  private configureToolHandlers(server: Server, tool: CatFactsTool) {
-    // List available tools
-    server.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: tool.getToolDefinitions(),
-      };
-    });
-
-    // Handle tool calls
-    server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name } = request.params;
-      const args = (request.params.arguments ?? {}) as ToolArgs;
-
-      try {
-        const result = await tool.handleToolCall(name, args);
-        return result;
-      } catch (error) {
-        return {
-          content: [
+    /**
+     * Creates a new BraveServer instance
+     * @param {string} apiKey - Brave API key for authentication
+     */
+    constructor(apiKey: string) {
+        this.client = new BraveClient(apiKey);
+        this.server = new Server(
             {
-              type: "text",
-              text: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+                name: 'brave-search',
+                version: '0.1.0',
             },
-          ],
-          isError: true,
-        };
-      }
-    });
-  }
+            {
+                capabilities: {
+                    tools: {},
+                },
+            }
+        );
 
-  private createStandaloneServer = (): Server => {
-    const server = new Server(
-      {
-        name: this.config.name,
-        version: this.config.version,
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
-
-    const tool = new CatFactsTool(this.config);
-    this.configureToolHandlers(server, tool);
-    return server;
-  };
-
-  async run(transportConfig: TransportConfig) {
-    if (transportConfig.type === "stdio") {
-      const stdioTransport = new StdioTransport(transportConfig);
-      const transport = stdioTransport.createTransport();
-      await stdioTransport.start();
-      await this.server.connect(transport);
-      return;
+        this.setupHandlers();
+        this.setupErrorHandling();
     }
 
-    // HTTP mode: start streamable HTTP transport with per-session servers
-    const httpTransport = new HttpTransport(transportConfig);
-    await httpTransport.start(this.createStandaloneServer);
-  }
+    /**
+     * Sets up MCP request handlers for tools
+     * @private
+     */
+    private setupHandlers(): void {
+        // List available tools
+        this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+            tools: [webSearchToolDefinition, localSearchToolDefinition],
+        }));
+
+        // Handle tool calls
+        this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+            const { name, arguments: args } = request.params;
+
+            switch (name) {
+                case 'brave_web_search':
+                    return handleWebSearchTool(this.client, args);
+                
+                case 'brave_local_search':
+                    return handleLocalSearchTool(this.client, args);
+                
+                default:
+                    throw new McpError(
+                        ErrorCode.MethodNotFound,
+                        `Unknown tool: ${name}`
+                    );
+            }
+        });
+    }
+
+    /**
+     * Configures error handling and graceful shutdown
+     * @private
+     */
+    private setupErrorHandling(): void {
+        this.server.onerror = (error) => console.error('[MCP Error]', error);
+        
+        process.on('SIGINT', async () => {
+            await this.server.close();
+            process.exit(0);
+        });
+    }
+
+    /**
+     * Returns the underlying MCP server instance
+     * @returns {Server} MCP server instance
+     */
+    getServer(): Server {
+        return this.server;
+    }
+}
+
+/**
+ * Factory function for creating standalone server instances
+ * Used by HTTP transport for session-based connections
+ * @param {string} apiKey - Brave API key for authentication
+ * @returns {Server} Configured MCP server instance
+ */
+export function createStandaloneServer(apiKey: string): Server {
+    const server = new Server(
+        {
+            name: "brave-search-discovery",
+            version: "0.1.0",
+        },
+        {
+            capabilities: {
+                tools: {},
+            },
+        },
+    );
+
+    const client = new BraveClient(apiKey);
+
+    // Set up handlers
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+        tools: [webSearchToolDefinition, localSearchToolDefinition],
+    }));
+
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        const { name, arguments: args } = request.params;
+
+        switch (name) {
+            case 'brave_web_search':
+                return handleWebSearchTool(client, args);
+            
+            case 'brave_local_search':
+                return handleLocalSearchTool(client, args);
+            
+            default:
+                throw new McpError(
+                    ErrorCode.MethodNotFound,
+                    `Unknown tool: ${name}`
+                );
+        }
+    });
+
+    return server;
 }

@@ -1,43 +1,36 @@
 /**
- * Configuration management for the Cat Facts MCP Server
+ * Configuration interface for the Brave Search MCP Server
+ * @interface Config
  */
-
-import { ServerConfig, TransportConfig } from './types.js';
-
-export const defaultServerConfig: ServerConfig = {
-  name: 'cat-facts-mcp-server',
-  version: '1.0.0',
-  apiBaseUrl: 'https://catfact.ninja',
-  defaultLimit: 5,
-  maxLimit: 100,
-  minLength: 1,
-  maxLength: 500
-};
-
-export const defaultTransportConfig: TransportConfig = {
-  type: 'stdio'
-};
-
-export function getServerConfig(): ServerConfig {
-  return {
-    ...defaultServerConfig,
-    // Allow environment variable overrides
-    name: process.env.MCP_SERVER_NAME || defaultServerConfig.name,
-    version: process.env.MCP_SERVER_VERSION || defaultServerConfig.version,
-    apiBaseUrl: process.env.CAT_FACTS_API_URL || defaultServerConfig.apiBaseUrl,
-    defaultLimit: parseInt(process.env.DEFAULT_LIMIT || defaultServerConfig.defaultLimit.toString()),
-    maxLimit: parseInt(process.env.MAX_LIMIT || defaultServerConfig.maxLimit.toString()),
-    minLength: parseInt(process.env.MIN_LENGTH || defaultServerConfig.minLength.toString()),
-    maxLength: parseInt(process.env.MAX_LENGTH || defaultServerConfig.maxLength.toString())
-  };
+export interface Config {
+    /** Brave API key for authentication */
+    apiKey: string;
+    /** Port number for HTTP server */
+    port: number;
+    /** Current environment mode */
+    nodeEnv: 'development' | 'production';
+    /** Convenience flag for production environment */
+    isProduction: boolean;
 }
 
-export function getTransportConfig(): TransportConfig {
-  const transportType = (process.env.MCP_TRANSPORT || 'stdio') as 'stdio' | 'http';
-  
-  return {
-    type: transportType,
-    port: transportType === 'http' ? parseInt(process.env.MCP_PORT || '3000') : undefined,
-    host: transportType === 'http' ? (process.env.MCP_HOST || 'localhost') : undefined
-  };
+/**
+ * Loads and validates configuration from environment variables
+ * @returns {Config} Validated configuration object
+ * @throws {Error} If required environment variables are missing
+ */
+export function loadConfig(): Config {
+    const apiKey = process.env.BRAVE_API_KEY;
+    if (!apiKey) {
+        throw new Error('BRAVE_API_KEY environment variable is required');
+    }
+
+    const nodeEnv = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+    const port = parseInt(process.env.PORT || '3002', 10);
+
+    return {
+        apiKey,
+        port,
+        nodeEnv,
+        isProduction: nodeEnv === 'production',
+    };
 }
