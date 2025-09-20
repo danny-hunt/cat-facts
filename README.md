@@ -1,6 +1,6 @@
 # Cat Facts MCP Server
 
-A Model Context Protocol (MCP) server that provides access to cat facts from the [catfact.ninja](https://catfact.ninja/) API.
+A Model Context Protocol (MCP) server that provides access to cat facts from the [catfact.ninja](https://catfact.ninja/) API. Built with TypeScript and following modern server architecture patterns.
 
 ## Features
 
@@ -8,12 +8,22 @@ A Model Context Protocol (MCP) server that provides access to cat facts from the
 - Get multiple random cat facts
 - Optional length limits for facts
 - Built with the official MCP SDK
+- TypeScript support with full type safety
+- Modular architecture with separate concerns
+- Multiple transport options (STDIO and HTTP)
+- Comprehensive configuration management
+- Command-line interface with argument parsing
 
 ## Installation
 
 1. Install dependencies:
 ```bash
 npm install
+```
+
+2. Build the TypeScript code:
+```bash
+npm run build
 ```
 
 ## Usage
@@ -28,6 +38,18 @@ npm start
 Or for development with auto-restart:
 ```bash
 npm run dev
+```
+
+### Command Line Options
+
+```bash
+node dist/index.js [options]
+
+Options:
+  --transport, -t <type>    Transport type: stdio or http (default: stdio)
+  --port, -p <number>       Port for HTTP transport (default: 3000)
+  --host, -h <string>       Host for HTTP transport (default: localhost)
+  --help                    Show help message
 ```
 
 ### Available Tools
@@ -77,11 +99,26 @@ To use this server with an MCP client, add it to your client configuration:
   "mcpServers": {
     "cat-facts": {
       "command": "node",
-      "args": ["/path/to/this/directory/index.js"]
+      "args": ["/path/to/this/directory/dist/index.js"]
     }
   }
 }
 ```
+
+### Environment Variables
+
+The server supports various environment variables for configuration:
+
+- `MCP_TRANSPORT`: Transport type (stdio|http)
+- `MCP_PORT`: Port for HTTP transport
+- `MCP_HOST`: Host for HTTP transport
+- `MCP_SERVER_NAME`: Server name
+- `MCP_SERVER_VERSION`: Server version
+- `CAT_FACTS_API_URL`: Cat facts API base URL
+- `DEFAULT_LIMIT`: Default limit for multiple facts
+- `MAX_LIMIT`: Maximum limit for multiple facts
+- `MIN_LENGTH`: Minimum fact length
+- `MAX_LENGTH`: Maximum fact length
 
 ## API Reference
 
