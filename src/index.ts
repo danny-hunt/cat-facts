@@ -1,44 +1,44 @@
 #!/usr/bin/env node
 
-import { config as loadEnv } from 'dotenv';
+import { config as loadEnv } from "dotenv";
 
 // Load environment variables
 loadEnv();
 
-import { loadConfig } from './config.js';
-import { parseArgs } from './cli.js';
-import { BraveServer } from './server.js';
-import { runStdioTransport, startHttpTransport } from './transport/index.js';
+import { loadConfig } from "./config.js";
+import { parseArgs } from "./cli.js";
+import { CatFactsServer } from "./server.js";
+import { runStdioTransport, startHttpTransport } from "./transport/index.js";
 
 /**
- * Main entry point for the Brave Search MCP Server
- * 
+ * Main entry point for the Cat Facts MCP Server
+ *
  * Transport selection logic:
  * 1. --stdio flag forces STDIO transport
  * 2. --port flag or PORT env var triggers HTTP transport
  * 3. Default: STDIO for local development
  */
 async function main() {
-    try {
-        const config = loadConfig();
-        const cliOptions = parseArgs();
-        
-        // Determine transport mode
-        const shouldUseHttp = cliOptions.port || (process.env.PORT && !cliOptions.stdio);
-        const port = cliOptions.port || config.port;
-        
-        if (shouldUseHttp) {
-            // HTTP transport for production/cloud deployment
-            startHttpTransport({ ...config, port });
-        } else {
-            // STDIO transport for local development
-            const server = new BraveServer(config.apiKey);
-            await runStdioTransport(server.getServer());
-        }
-    } catch (error) {
-        console.error("Fatal error running Brave Search server:", error);
-        process.exit(1);
+  try {
+    const config = loadConfig();
+    const cliOptions = parseArgs();
+
+    // Determine transport mode
+    const shouldUseHttp = cliOptions.port || (process.env.PORT && !cliOptions.stdio);
+    const port = cliOptions.port || config.port;
+
+    if (shouldUseHttp) {
+      // HTTP transport for production/cloud deployment
+      startHttpTransport({ ...config, port });
+    } else {
+      // STDIO transport for local development
+      const server = new CatFactsServer(config.apiBaseUrl);
+      await runStdioTransport(server.getServer());
     }
+  } catch (error) {
+    console.error("Fatal error running Cat Facts server:", error);
+    process.exit(1);
+  }
 }
 
 // Run the server

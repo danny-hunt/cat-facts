@@ -1,166 +1,134 @@
-import { Tool, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { BraveClient } from '../client.js';
-import { WebSearchArgs, LocalSearchArgs } from '../types.js';
+import { Tool, CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { CatFactsClient } from "../client.js";
+import { GetCatFactArgs, GetCatFactsArgs } from "../types.js";
 
 /**
- * Tool definition for Brave web search
+ * Tool definition for getting a single cat fact
  */
 export const webSearchToolDefinition: Tool = {
-    name: "brave_web_search",
-    description:
-        "Performs a web search using the Brave Search API, ideal for general queries, news, articles, and online content. " +
-        "Use this for broad information gathering, recent events, or when you need diverse web sources. " +
-        "Supports pagination, content filtering, and freshness controls. " +
-        "Maximum 20 results per request, with offset for pagination.",
-    inputSchema: {
-        type: "object",
-        properties: {
-            query: {
-                type: "string",
-                description: "Search query (max 400 chars, 50 words)"
-            },
-            count: {
-                type: "number",
-                description: "Number of results (1-20, default 10)",
-                default: 10
-            },
-            offset: {
-                type: "number",
-                description: "Pagination offset (max 9, default 0)",
-                default: 0
-            },
-        },
-        required: ["query"],
+  name: "get_cat_fact",
+  description: "Retrieves a single random cat fact from catfact.ninja. " + "Optionally constrain by maximum length.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      max_length: {
+        type: "number",
+        description: "Maximum fact length (1-500)",
+      },
     },
+    required: [],
+  },
 };
 
 /**
- * Tool definition for Brave local search
+ * Tool definition for getting multiple cat facts
  */
 export const localSearchToolDefinition: Tool = {
-    name: "brave_local_search",
-    description:
-        "Searches for local businesses and places using Brave's Local Search API. " +
-        "Best for queries related to physical locations, businesses, restaurants, services, etc. " +
-        "Returns detailed information including:\n" +
-        "- Business names and addresses\n" +
-        "- Ratings and review counts\n" +
-        "- Phone numbers and opening hours\n" +
-        "Use this when the query implies 'near me' or mentions specific locations. " +
-        "Automatically falls back to web search if no local results are found.",
-    inputSchema: {
-        type: "object",
-        properties: {
-            query: {
-                type: "string",
-                description: "Local search query (e.g. 'pizza near Central Park')"
-            },
-            count: {
-                type: "number",
-                description: "Number of results (1-20, default 5)",
-                default: 5
-            },
-        },
-        required: ["query"]
-    }
+  name: "get_cat_facts",
+  description:
+    "Retrieves multiple random cat facts from catfact.ninja. " + "Supports limit and maximum length filters.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      limit: {
+        type: "number",
+        description: "Number of facts (1-100, default 5)",
+        default: 5,
+      },
+      max_length: {
+        type: "number",
+        description: "Maximum fact length (1-500)",
+      },
+    },
+    required: [],
+  },
 };
 
 /**
- * Type guard for web search arguments
+ * Type guard for get_cat_fact arguments
  * @param {unknown} args - Arguments to validate
- * @returns {boolean} True if arguments are valid for web search
+ * @returns {boolean} True if arguments are valid for single fact
  */
-function isWebSearchArgs(args: unknown): args is WebSearchArgs {
-    return (
-        typeof args === "object" &&
-        args !== null &&
-        "query" in args &&
-        typeof (args as { query: string }).query === "string"
-    );
+function isWebSearchArgs(args: unknown): args is GetCatFactArgs {
+  return typeof args === "object" && args !== null;
 }
 
 /**
- * Type guard for local search arguments
+ * Type guard for get_cat_facts arguments
  * @param {unknown} args - Arguments to validate
- * @returns {boolean} True if arguments are valid for local search
+ * @returns {boolean} True if arguments are valid for multiple facts
  */
-function isLocalSearchArgs(args: unknown): args is LocalSearchArgs {
-    return (
-        typeof args === "object" &&
-        args !== null &&
-        "query" in args &&
-        typeof (args as { query: string }).query === "string"
-    );
+function isLocalSearchArgs(args: unknown): args is GetCatFactsArgs {
+  return typeof args === "object" && args !== null;
 }
 
 /**
- * Handles web search tool calls
- * @param {BraveClient} client - Brave API client instance
+ * Handles get_cat_fact tool calls
+ * @param {CatFactsClient} client - Cat Facts API client instance
  * @param {unknown} args - Tool call arguments
  * @returns {Promise<CallToolResult>} Tool call result
  */
-export async function handleWebSearchTool(client: BraveClient, args: unknown): Promise<CallToolResult> {
-    try {
-        if (!args) {
-            throw new Error("No arguments provided");
-        }
-
-        if (!isWebSearchArgs(args)) {
-            throw new Error("Invalid arguments for brave_web_search");
-        }
-
-        const { query, count = 10, offset = 0 } = args;
-        const results = await client.performWebSearch(query, count, offset);
-        
-        return {
-            content: [{ type: "text", text: results }],
-            isError: false,
-        };
-    } catch (error) {
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-                },
-            ],
-            isError: true,
-        };
+export async function handleWebSearchTool(client: CatFactsClient, args: unknown): Promise<CallToolResult> {
+  try {
+    if (!args) {
+      // allow empty args for single fact
+      args = {};
     }
+
+    if (!isWebSearchArgs(args)) {
+      throw new Error("Invalid arguments for get_cat_fact");
+    }
+
+    const { max_length } = args as GetCatFactArgs;
+    const results = await client.getSingleFact(max_length);
+
+    return {
+      content: [{ type: "text", text: results }],
+      isError: false,
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+      isError: true,
+    };
+  }
 }
 
 /**
- * Handles local search tool calls
- * @param {BraveClient} client - Brave API client instance
+ * Handles get_cat_facts tool calls
+ * @param {CatFactsClient} client - Cat Facts API client instance
  * @param {unknown} args - Tool call arguments
  * @returns {Promise<CallToolResult>} Tool call result
  */
-export async function handleLocalSearchTool(client: BraveClient, args: unknown): Promise<CallToolResult> {
-    try {
-        if (!args) {
-            throw new Error("No arguments provided");
-        }
+export async function handleLocalSearchTool(client: CatFactsClient, args: unknown): Promise<CallToolResult> {
+  try {
+    if (!args) args = {};
 
-        if (!isLocalSearchArgs(args)) {
-            throw new Error("Invalid arguments for brave_local_search");
-        }
-
-        const { query, count = 5 } = args;
-        const results = await client.performLocalSearch(query, count);
-        
-        return {
-            content: [{ type: "text", text: results }],
-            isError: false,
-        };
-    } catch (error) {
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-                },
-            ],
-            isError: true,
-        };
+    if (!isLocalSearchArgs(args)) {
+      throw new Error("Invalid arguments for get_cat_facts");
     }
+
+    const { limit = 5, max_length } = args as GetCatFactsArgs;
+    const results = await client.getMultipleFacts(limit, max_length);
+
+    return {
+      content: [{ type: "text", text: results }],
+      isError: false,
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+      isError: true,
+    };
+  }
 }
