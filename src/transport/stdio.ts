@@ -1,22 +1,14 @@
-/**
- * STDIO transport for development
- */
-
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { TransportConfig } from "../types.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 
-export class StdioTransport {
-  private config: TransportConfig;
-
-  constructor(config: TransportConfig) {
-    this.config = config;
-  }
-
-  createTransport() {
-    return new StdioServerTransport();
-  }
-
-  async start() {
-    console.error("Cat Facts MCP Server running on stdio");
-  }
+/**
+ * Runs the MCP server using STDIO transport
+ * Used for local development and debugging
+ * @param {Server} server - MCP server instance to connect
+ * @returns {Promise<void>}
+ */
+export async function runStdioTransport(server: Server): Promise<void> {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("Cat facts MCP server running on stdio");
 }
